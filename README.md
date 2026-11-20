@@ -1,4 +1,4 @@
-# Toparlak Lig ⚽ (v3.1)
+# Toparlak Lig ⚽ (v4.1)
 
 Yuvarlak karakterlerle sert, arcade 1v1 tarayıcı futbolu: roket şutlar rakibi uçurur, bombalar patlar, 3 darbede rakip sersemler.
 
@@ -18,9 +18,9 @@ Yuvarlak karakterlerle sert, arcade 1v1 tarayıcı futbolu: roket şutlar rakibi
 Bağlantı koparsa oyun 25 saniye boyunca otomatik yeniden bağlanır. Rakibin girdisi takılırsa oyun ikiniz için de donar, yani boş kaleye gol atılamaz.
 
 ## Yetenek kartları
-Maç başında 20 karttan 3'ünü seçersin. Maçta üçü de elinde: **1-2-3** tuşlarıyla her birini ayrı kullanırsın, her birinin kendi bekleme süresi var. Aynı anda basıp **kombola** (ör. Roket + Falso = falsolu roket).
+Maç başında 15 karttan 3'ünü seçersin. Maçta üçü de elinde: **1-2-3** tuşlarıyla her birini ayrı kullanırsın, her birinin kendi bekleme süresi var. Aynı anda basıp **kombola** (ör. Roket + Falso = falsolu roket).
 
-🚀 Roket Şut · 💨 Atılma · 🌀 Falso · 💥 Şok Dalgası · 🧲 Mıknatıs · 🦍 Dev Mod · 🧊 Buz · ✨ Işınlanma · 🛡️ Kale Duvarı · 👻 Hayalet · ⚡ Turbo · 🐜 Küçült · 🔄 Ters Kontrol · 💣 Bomba Top · 🧨 Mayın · 🌪️ Rüzgar · 🏀 Lastik Top · 🪄 Topu Çağır · 🌫️ Sis · 🧤 Kaleci Eldiveni
+🚀 Roket Şut · 🌀 Falso · 💥 Şok Dalgası · 🧊 Buz · ✨ Işınlanma · 🛡️ Kale Duvarı · 👻 Hayalet · ⚡ Turbo · 🔄 Ters Kontrol · 💣 Bomba Top · 🧨 Mayın · 🌪️ Rüzgar · 🪄 Topu Çağır · 🌫️ Sis · 🧤 Kaleci Eldiveni
 
 ## Arcade kuralları
 - **Şut tuşu bırakınca vurur.** Ne kadar uzun basılı tutarsan o kadar sert.

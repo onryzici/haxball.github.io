@@ -40,7 +40,6 @@
   let off = [];
   let onlineDecks = [];
   let netPaused = false;
-  let recBuf = [], replay = null;
   const mouse = { x: 0, y: 0 };
   window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
@@ -106,7 +105,6 @@
     sim = new TP.Sim({ chars: cs, teams, timeLimit: opts.time, scoreLimit: opts.goals, decks, client: m === 'guest', map: opts.map || 'klasik', chaos: !!opts.chaos });
     if (!opts.theme) opts.theme = pickTheme();
     R.setTheme(opts.theme);
-    recBuf = []; replay = null; setReplayUI(false);
     bots = cs.map((_, i) => (ex.botIdx || []).includes(i) ? new TP.Bot(ex.botLevel || settings.bot) : null);
     lastSnapTk = -1; lastEvId = 0; recentEv = [];
     hostIns = []; pred = []; pendingSnap = null; snapAt = 0; off = new Array(2 + cs.length * 2).fill(0);
@@ -178,10 +176,10 @@
     power: ['{n} sert vurdu!', 'Bomba gibi şut {n}\'den!', '{n} topu patlattı!'],
     burn: ['{v} alevlerin içinde kaldı!', 'Roket {v}\'yi yerle bir etti!'],
     tired: ['{n} nefes nefese kaldı!', '{n} çok yoruldu, biraz dinlenmeli.'],
-    ab: { dev: '{n} devleşti!', sok: '{n} şok dalgasıyla ortalığı dağıttı!', atilma: '{n} rüzgar gibi atıldı!', roket: '{n} roket şutu hazırlıyor!', falso: '{n} falsolu bir şey deneyecek…',
-      miknatis: '{n} topu ayağına çekiyor!', buz: '{n} rakibini dondurdu!', isinlan: '{n} topun arkasına ışınlandı!', kalkan: '{n} kalesinin önüne duvar ördü!', eldiven: '{n} eldivenlerini giydi!',
-      hayalet: '{n} hayalete dönüştü!', turbo: '{n} turboyu açtı!', kucult: '{n} rakibini karıncaya çevirdi!', ters: '{n} rakibinin beynini ters çevirdi!', bomba: '{n} topa bomba bağladı!',
-      mayin: '{n} mayın döşüyor…', ruzgar: '{n} fırtına çıkardı!', lastik: 'Top lastik gibi! {n} işi şansa bıraktı.', cagir: '{n} topu sihirle çağırdı!', sis: 'Top kayboldu! {n} sis bıraktı!' },
+    ab: { sok: '{n} şok dalgasıyla ortalığı dağıttı!', roket: '{n} roket şutu hazırlıyor!', falso: '{n} falsolu bir şey deneyecek…',
+      buz: '{n} rakibini dondurdu!', isinlan: '{n} topun arkasına ışınlandı!', kalkan: '{n} kalesinin önüne duvar ördü!', eldiven: '{n} eldivenlerini giydi!',
+      hayalet: '{n} hayalete dönüştü!', turbo: '{n} turboyu açtı!', ters: '{n} rakibinin beynini ters çevirdi!', bomba: '{n} topa bomba bağladı!',
+      mayin: '{n} mayın döşüyor…', ruzgar: '{n} fırtına çıkardı!', cagir: '{n} topu sihirle çağırdı!', sis: 'Top kayboldu! {n} sis bıraktı!' },
     overtime: ['Süre bitti, eşitlik! Altın gol zamanı!'],
     dizzy: ['{n} yıldızları sayıyor!', '{n} sersemledi, kafası dönüyor!', 'Üç darbe, {n} yere serildi!'],
     burn2: ['{v} füzeyle uzaya gönderildi!', 'Roket {v}\'yi tribünlere uçurdu!', '{v} havada takla atıyor!'],
@@ -209,7 +207,7 @@
     R.onEvent(e);
     if (silent) return;
     const nm = (t) => teamName(t);
-    const pn = (e) => e.pi != null && e.pi >= 0 && matchChars && matchChars[e.pi] ? matchChars[e.pi].name : pn(e);
+    const pn = (e) => e.pi != null && e.pi >= 0 && matchChars && matchChars[e.pi] ? matchChars[e.pi].name : nm(e.team);
     switch (e.k) {
       case 'kick': A.kick(e.s); break;
       case 'curve': A.curve(); break;
@@ -242,7 +240,7 @@
         else if (LINES.ab[e.a]) spiker(fmtLine(LINES.ab[e.a], { n: pn(e) })); break;
       case 'whistle': A.whistle(false); centerText('BAŞLA!', 650, true); break;
       case 'goal': {
-        A.goal(); slowT = 0.6; goalBanner(e);
+        A.goal(); slowT = 0.6; goalBanner(e); R.replayGoal();
         const k = Math.round(e.s * 10.8);
         const line = e.own ? pick(LINES.own) : k > 115 ? pick(LINES.goalFast) : pick(LINES.goal);
         spiker(fmtLine(line, { n: e.own ? nm(e.team) : pn(e), o: pn(e), k }), 3500, true);
@@ -306,7 +304,7 @@
           el.title = A_.name;
         });
       }
-      const armed = { roket: p.rocket > 0, falso: p.curve > 0, miknatis: p.magnet > 0, dev: p.giant > 0, hayalet: p.ghost > 0, turbo: p.turbo > 0, eldiven: p.glove > 0 };
+      const armed = { roket: p.rocket > 0, falso: p.curve > 0, hayalet: p.ghost > 0, turbo: p.turbo > 0, eldiven: p.glove > 0 };
       slots.forEach((el, k) => {
         const a = p.deck && p.deck[k];
         if (!a) return;
@@ -570,10 +568,10 @@
   };
 
   // ---------- KART SEÇİMİ ----------
-  const CARD_COLORS = { roket: ['#ff7b00', '#7a1e00'], atilma: ['#9aa5b1', '#2b3748'], falso: ['#9b5de5', '#3c1a6e'], sok: ['#f8f9fa', '#5c677d'], miknatis: ['#3a86ff', '#0b3d91'],
-    dev: ['#8ac926', '#2d5016'], buz: ['#a2d2ff', '#1d4e89'], isinlan: ['#e0c3ff', '#5a189a'], kalkan: ['#ffd23f', '#7a5c00'], eldiven: ['#ffe08a', '#8a5a00'],
-    hayalet: ['#dfe7fd', '#4a4e69'], turbo: ['#ffd23f', '#b5179e'], kucult: ['#c9ada7', '#5e548e'], ters: ['#ff5d8f', '#590d22'], bomba: ['#555', '#111'],
-    mayin: ['#e85d04', '#370617'], ruzgar: ['#cfe8ff', '#277da1'], lastik: ['#ff7b00', '#7a3200'], cagir: ['#c77dff', '#240046'], sis: ['#adb5bd', '#343a40'] };
+  const CARD_COLORS = { roket: ['#ff7b00', '#7a1e00'], falso: ['#9b5de5', '#3c1a6e'], sok: ['#f8f9fa', '#5c677d'],
+    buz: ['#a2d2ff', '#1d4e89'], isinlan: ['#e0c3ff', '#5a189a'], kalkan: ['#ffd23f', '#7a5c00'], eldiven: ['#ffe08a', '#8a5a00'],
+    hayalet: ['#dfe7fd', '#4a4e69'], turbo: ['#ffd23f', '#b5179e'], ters: ['#ff5d8f', '#590d22'], bomba: ['#555', '#111'],
+    mayin: ['#e85d04', '#370617'], ruzgar: ['#cfe8ff', '#277da1'], cagir: ['#c77dff', '#240046'], sis: ['#adb5bd', '#343a40'] };
   let draft = null;
   // players: [{idx, ch, slot}], online: true ise süre sınırı ve bekleme
   function openDraft(players, onDone, online) {
@@ -1053,33 +1051,9 @@
     net.broadcast({ t: 's', m: matchId, s: sim.snapshot(), ev: recentEv, a, ins }, true);
   }
 
-  // ---------- GOL TEKRARI ----------
-  function snapFrame(sim) {
-    const cp = (o) => Object.assign({}, o);
-    return { t: performance.now(), ball: cp(sim.ball), players: sim.players.map(cp), shields: sim.shields.map(cp), mines: (sim.mines || []).map(cp),
-      pickups: (sim.pickups || []).map(cp), wind: sim.wind ? cp(sim.wind) : null, fog: sim.fog, bouncy: sim.bouncy };
-  }
-  function scheduleReplay() {
-    const now = performance.now();
-    replay = { goalT: now, start: now + 1500, frames: null, speed: 0.55 };
-  }
-  function setReplayUI(on) { document.body.classList.toggle('replay', !!on); }
-  function replayFrame(now) {
-    if (!replay) return null;
-    if (!sim || sim.phase !== 'goal' || mode === 'attract') { replay = null; setReplayUI(false); return null; }
-    if (now < replay.start) return null;
-    if (!replay.frames) {
-      replay.frames = recBuf.filter(f => f.t >= replay.goalT - 2000 && f.t <= replay.goalT + 300);
-      if (replay.frames.length < 10) { replay = null; return null; }
-      R.reset(); setReplayUI(true);
-    }
-    const fr = replay.frames, t0 = fr[0].t;
-    const tt = t0 + (now - replay.start) * replay.speed;
-    if (tt > fr[fr.length - 1].t) { replay = null; setReplayUI(false); R.reset(); return null; }
-    let i = 0; while (i < fr.length - 1 && fr[i + 1].t < tt) i++;
-    return fr[i];
-  }
-  window.addEventListener('keydown', (e) => { if (replay && replay.frames && (e.code === 'Space' || e.code === 'Enter')) { replay = null; setReplayUI(false); R.reset(); } });
+  // ---------- GOL TEKRARI (yalnızca çizim: kaydı ve oynatmayı R yapar) ----------
+  window.addEventListener('keydown', (e) => { if (!e.repeat && (e.code === 'Space' || e.code === 'Enter')) R.skipReplay(); });
+  canvas.addEventListener('pointerdown', () => R.skipReplay());
 
   // ---------- LAF SOKMA (gol sonrası 5 sn) ----------
   let taunts = load('tp_taunts', null);
@@ -1186,16 +1160,11 @@
   function frame(now) {
     requestAnimationFrame(frame);
     const { dt, ts, ext } = pump(now, 8);
-    const rf = replayFrame(now);
-    if (rf) {
-      R.draw(rf, dt * 60 * replay.speed, 0);
-    } else {
-      const smooth = mode === 'guest' && sim;
-      if (smooth) nudge(1);
-      if (sim) R.draw(sim, paused ? 0 : dt * 60 * ts, ext);
-      if (smooth) nudge(-1);
-
-    }
+    const smooth = mode === 'guest' && sim;
+    if (smooth) nudge(1);
+    if (sim) R.draw(sim, paused ? 0 : dt * 60 * ts, ext);
+    if (smooth) nudge(-1);
+    document.body.classList.toggle('replay', R.replaying);
     updateHUD();
     updateTauntPanels();
     if (visible('menu')) drawChar($('menuPreview'), chars[0]);

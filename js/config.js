@@ -1,6 +1,6 @@
 // TOPARLAK — sabitler, yetenekler, renkler
 window.TP = window.TP || {};
-TP.VERSION = 'v4.0 • 20.11.2026';
+TP.VERSION = 'v4.1 • 20.11.2026';
 
 TP.C = {
   TICK: 1 / 60,
@@ -51,23 +51,18 @@ TP.C = {
 // Yetenekler
 TP.ABILITIES = {
   roket:  { name: 'Roket Şut',   icon: '🚀', cd: 9.5, desc: 'Sonraki şutun füze olur: en sert şutun 1.6 katı hızla gider, yavaşlamaz, kaleye yönelir. Rakibi delip uçurur!' },
-  atilma: { name: 'Atılma',      icon: '💨', cd: 4.5, desc: 'Gittiğin yöne ani hız patlaması. Rakibe çarparsan onu itersin.' },
   falso:  { name: 'Falso',       icon: '🌀', cd: 7,   desc: 'Sonraki şutun güçlü kavis alır. Top havadayken sağa/sola basarak kavisi yönet! Basılı tutarken yolu görünür.' },
   sok:    { name: 'Şok Dalgası', icon: '💥', cd: 8,   desc: 'Etrafındaki top ve rakibi güçlü bir dalgayla dışarı fırlatır.' },
-  miknatis:{ name: 'Mıknatıs',   icon: '🧲', cd: 10,  desc: '1.6 saniye boyunca topu ayağının önüne, hücum yönüne çeker. Dripling ustası.' },
-  dev:    { name: 'Dev Mod',     icon: '🦍', cd: 13,  desc: '5 saniye boyunca büyür ve ağırlaşırsın. Kaleyi kapat, rakibi ez.' },
   buz:    { name: 'Buz',         icon: '🧊', cd: 10,  desc: 'Yakınındaki rakibi 2.5 saniye dondurur: yavaşlar, koşamaz, şut şarjı sıfırlanır. Uzaktaysa ıskalarsın.' },
   isinlan:{ name: 'Işınlanma',   icon: '✨', cd: 11,   desc: 'Anında topun arkasına, rakip kaleye bakacak şekilde ışınlanırsın.' },
   kalkan: { name: 'Kale Duvarı', icon: '🛡️', cd: 12,  desc: 'Kalenin önüne 4.5 saniyelik sağlam bir duvar dikersin.' },
   eldiven:{ name: 'Kaleci Eldiveni', icon: '🧤', cd: 11, desc: '3 saniye boyunca kendi yarı sahanda topa değersen onu kısa süre tutarsın, şutla bırakırsın. Roketleri de tutar.' },
   hayalet:{ name: 'Hayalet',     icon: '👻', cd: 9,   desc: '4 saniye boyunca RAKİP SENİ GÖREMEZ, içinden geçersin, mayınlara basmazsın.' },
   turbo:  { name: 'Turbo',       icon: '⚡', cd: 11,  desc: '4 saniye boyunca çok hızlısın ve koşu barın hiç azalmaz.' },
-  kucult: { name: 'Küçült',      icon: '🐜', cd: 11,  desc: 'Rakibi 5 saniye minicik yapar: yavaş itilir, şutları zayıf.' },
-  ters:   { name: 'Ters Kontrol',icon: '🔄', cd: 12,  desc: 'Rakibin tuşları 3 saniye ters çalışır. Sola basan sağa gider!' },
+  ters:   { name: 'Ters Kontrol',icon: '🔄', cd: 12,  desc: 'Rakibin tuşları 2 saniye ters çalışır. Sola basan sağa gider!' },
   bomba:  { name: 'Bomba Top',   icon: '💣', cd: 10,  desc: 'Top 1.7 saniye sonra patlar: yakındakiler savrulur, rakip sersemler.' },
   mayin:  { name: 'Mayın',       icon: '🧨', cd: 7,   desc: 'Bulunduğun yere mayın bırakırsın (en fazla 2). Rakip basarsa havaya uçar.' },
   ruzgar: { name: 'Rüzgar',      icon: '🌪️', cd: 20,  desc: '3.5 saniye boyunca top ve rakip, rakip kaleye doğru rüzgarla itilir.' },
-  lastik: { name: 'Lastik Top',  icon: '🏀', cd: 9,   desc: '7 saniye boyunca top duvarlardan fırlar ve neredeyse hiç yavaşlamaz.' },
   cagir:  { name: 'Topu Çağır',  icon: '🪄', cd: 14,  desc: 'Top nerede olursa olsun anında ayağının önüne gelir.' },
   sis:    { name: 'Sis',         icon: '🌫️', cd: 9,   desc: 'Top 2.8 saniye boyunca neredeyse görünmez olur. Kafalar karışsın!' },
 };
@@ -134,7 +129,7 @@ TP.SWATCHES = ['#e63946', '#f4a261', '#ffd23f', '#2a9d8f', '#06d6a0', '#118ab2',
 TP.defaultChar = function (i) {
   const presets = [
     { name: 'Oyuncu 1', c1: '#e63946', c2: '#f8f9fa', pattern: 'dikey', number: 10, eyes: 'kizgin', ability: 'roket', hair: 'diken', hairColor: '#1b1b1b', acc: 'yok' },
-    { name: 'Oyuncu 2', c1: '#3a86ff', c2: '#ffd23f', pattern: 'halka', number: 7, eyes: 'normal', ability: 'atilma', hair: 'kisa', hairColor: '#e8c14f', acc: 'bandana' },
+    { name: 'Oyuncu 2', c1: '#3a86ff', c2: '#ffd23f', pattern: 'halka', number: 7, eyes: 'normal', ability: 'turbo', hair: 'kisa', hairColor: '#e8c14f', acc: 'bandana' },
   ];
   return Object.assign({}, presets[i % 2]);
 };

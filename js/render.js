@@ -544,6 +544,10 @@
   // =====================================================================
   //  RENDERER
   // =====================================================================
+  const TRAIL_N = 64, TRAIL_T = 10; // hız izi: halka tampon boyu, iz süresi (tick)
+  // gol tekrarı (goalTimer tick'i cinsinden): START'ta başlar (~1 sn canlı kutlamadan sonra), en geç END'de biter (santradan önce)
+  const RP = { START: 265, END: 24, SPEED: 0.55, LEN: 135, POST: 15, FADE: 8, MAX: 180, ZOOM: 1.55 };
+
   class Renderer {
     constructor(canvas) {
       this.cv = canvas; this.ctx = canvas.getContext('2d');
@@ -554,9 +558,11 @@
       this.netWobble = [[0, 0, 0], [0, 0, 0]];
       this.look = [0, Math.PI]; this.blinkT = [100, 160]; this.stepPhase = [0, 0];
       this.ghosts = []; this.celebrate = null;
+      this.trail = new Float32Array(TRAIL_N * 3); this.trailP = new Float32Array((TRAIL_N + 1) * 3); this.trailN = 0; this.trailI = 0; this.trailK = 0;
       this.crowd = null; this.teamColors = ['#e63946', '#3a86ff'];
       this.pitch = null; this.stadium = null; this.bakedScale = 0;
       this.boardOffset = 0; this.theme = 'gunduz'; this.emotes = [null, null]; this.taunts = [null, null]; this.flyAng = [0, 0]; this.viewer = 'shared'; this.ballTrail = []; this.bumperFlash = [0, 0, 0, 0];
+      this.rec = []; this.rp = null; this.rpArm = null; this.rpFade = 0; this.cam = null;
       this.resize();
     }
 
@@ -576,6 +582,8 @@
     reset() {
       this.fx = new FX(); this.ghosts = []; this.confettiT = 0; this.hype = 0; this.shake = 0; this.flash = 0; this.zoomPunch = 0;
       this.celebrate = null; this.ballZ = 0; this.ballVZ = 0; this.emotes = []; this.taunts = [];
+      this.trailN = 0; this.trailK = 0;
+      this.rec = []; this.rp = null; this.rpArm = null; this.rpFade = 0; this.cam = null;
     }
 
     // chars: oyuncu başına karakter; teams: oyuncu başına takım (varsayılan 0,1)
@@ -590,6 +598,7 @@
       this.look = fill(this.look, i => this.pteam[i] ? Math.PI : 0); this.blinkT = fill(this.blinkT, () => 100 + Math.random() * 100);
       this.stepPhase = fill(this.stepPhase, () => 0); this.flyAng = fill(this.flyAng, () => 0);
       this.emotes = []; this.taunts = []; this.me = -1;
+      this.teamRGB = this.teamColors.map(c => /^#[0-9a-f]{6}$/i.test(c) ? hexToRgb(c) : [255, 255, 255]);
       this.buildCrowd();
     }
 
@@ -645,6 +654,7 @@
 
     // ---- Olay tabanlı efektler ----
     onEvent(e) {
+      if (this.rp && e.k !== 'kickoff' && e.k !== 'end') return; // tekrar sırasında canlı efekt yok
       const fx = this.fx;
       const tc = (t) => this.teamColors[t] || '#fff';
       switch (e.k) {
@@ -713,12 +723,6 @@
               fx.ring(e.x, e.y, 16, 120, 32, col, 6);
               fx.burst(e.x, e.y, 30, { speed: 6, color: ['#fff', col], life: 26, size: 2.5, drag: 0.9 });
               this.shakeBy(14); this.flash = 0.2; break;
-            case 'atilma':
-              fx.burst(e.x, e.y, 14, { speed: 3, color: ['#fff', '#cfe8a9'], life: 20, size: 2.5 }); this.shakeBy(3); break;
-            case 'dev':
-              fx.ring(e.x, e.y, 20, 70, 24, col, 7); this.shakeBy(8);
-              fx.burst(e.x, e.y, 18, { speed: 4, color: ['#fff', col], life: 26, size: 3 }); break;
-            case 'miknatis': fx.ring(e.x, e.y, 170, 18, 30, '#7fd1ff', 4); break;
             case 'buz':
               if (e.hit === 0) { // ıskaladı: menzili göster
                 fx.ring(e.x, e.y, 20, C.BUZ_RANGE, 22, '#bfe9ff', 3);
@@ -741,6 +745,7 @@
               fx.ring(e.tx, e.ty, 50, 10, 24, '#ff5d8f', 5);
               fx.text(e.tx, e.ty - 36, '?!', '#ff5d8f', 24); break;
             case 'cagir':
+              this.trailN = 0;
               fx.burst(e.fx, e.fy, 18, { speed: 3, color: ['#fff', '#e0c3ff'], life: 24, size: 2.5 });
               fx.ring(e.x, e.y, 40, 6, 18, '#e0c3ff', 4); break;
             case 'turbo':
@@ -769,7 +774,8 @@
           break;
         }
         case 'kickoff':
-          this.hype = Math.max(this.hype, 0.2); this.celebrate = null;
+          this.trailN = 0;
+          this.hype = Math.max(this.hype, 0.2); this.celebrate = null; this.rec = [];
           break;
         case 'hit':
           fx.burst(e.x, e.y, 8, { speed: 3, color: ['#fff', '#ffd23f'], life: 16, size: 2 });
@@ -852,8 +858,91 @@
       }
     }
 
-    // ---- Ana çizim ----
+    // ---- Gol tekrarı: yalnızca çizim, sim/ağ etkilenmez ----
+    // Çizilen son ~3 sn kaydedilir; gol beklemesinde (goalTimer) ağır çekimde, yakın kamerayla oynatılır.
+    replayGoal() { const r = this.rec; if (r.length > 1 && r[r.length - 1].t - r[0].t >= 30) this.rpArm = this.time; }
+    skipReplay() { const rp = this.rp; if (rp && rp.g0 - rp.g > 12) rp.g1 = Math.max(rp.g1, rp.g - RP.FADE); }
+    get replaying() { return !!this.rp; }
+
     draw(sim, dt, ext) {
+      ext = ext || 0;
+      const g = sim.phase === 'goal' ? sim.goalTimer - ext : -1;
+      if (this.rpArm != null && (this.time - this.rpArm > 120 || sim.phase === 'over')) this.rpArm = null;
+      if (this.rpArm != null && g > 0 && g <= RP.START) this.startReplay(g);
+      let rp = this.rp;
+      if (rp && (g < rp.g1 || g > rp.g0 + 30)) { this.rp = rp = null; this.rpFade = RP.FADE; this.netWobble = [[0, 0, 0], [0, 0, 0]]; this.ballZ = 0; this.ballVZ = 0; }
+      let dark = 0;
+      if (rp) {
+        rp.g = g;
+        const f = this.replayFrame(rp, rp.t0 + Math.max(0, rp.g0 - g) * RP.SPEED, dt * RP.SPEED);
+        const keep = { fx: this.fx, ghosts: this.ghosts, celebrate: this.celebrate, confettiT: this.confettiT, shake: this.shake, zoomPunch: this.zoomPunch, flash: this.flash, netWobble: this.netWobble, ballTrail: this.ballTrail };
+        Object.assign(this, { fx: rp.fx, ghosts: rp.ghosts, celebrate: null, confettiT: 0, shake: 0, zoomPunch: 0, flash: 0, netWobble: f.nw, ballZ: f.z, ballVZ: 0,
+          ballTrail: rp.ballTrail, trailN: rp.trailN, trailI: rp.trailI, trailK: rp.trailK });
+        this.cam = rp.cam;
+        this.drawScene(f, dt * RP.SPEED, 0);
+        this.cam = null; rp.ghosts = this.ghosts;
+        Object.assign(rp, { ballTrail: this.ballTrail, trailN: this.trailN, trailI: this.trailI, trailK: this.trailK });
+        Object.assign(this, keep, { trailN: 0, trailK: 0 });
+        dark = Math.max(0, 1 - (rp.g0 - g) / RP.FADE, 1 - (g - rp.g1) / RP.FADE);
+        const ctx = this.ctx, W = this.cv.width, H = this.cv.height;
+        const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+        vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+        ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+      } else {
+        this.drawScene(sim, dt, ext);
+        // kayıt: bir tick'te en fazla bir kare, gol anından sonra kısa bir süre daha (top ağlarda)
+        const live = sim.phase === 'play' || sim.phase === 'kickoff' || (g > C.GOAL_PAUSE - RP.POST);
+        if (live && this.time - (this.recT || 0) >= 0.9) { this.recT = this.time; this.recFrame(sim, ext); }
+        if (this.rpArm != null && g > RP.START) dark = Math.max(0, 1 - (g - RP.START) / RP.FADE);
+        if (this.rpFade > 0) { dark = Math.max(dark, this.rpFade / RP.FADE); this.rpFade -= dt; }
+      }
+      if (dark > 0.01) { const ctx = this.ctx; ctx.fillStyle = `rgba(0,0,0,${Math.min(1, dark)})`; ctx.fillRect(0, 0, this.cv.width, this.cv.height); }
+    }
+
+    recFrame(sim, ext) {
+      const cp = (o) => Object.assign({}, o, { x: o.x + o.vx * ext, y: o.y + o.vy * ext });
+      const cl = (o) => Object.assign({}, o);
+      this.rec.push({ t: this.time, z: this.ballZ, nw: this.netWobble.map(a => a.slice()), ball: cp(sim.ball), players: sim.players.map(cp),
+        shields: sim.shields.map(cl), mines: sim.mines.map(cl), pickups: sim.pickups.map(cl), meteors: sim.meteors.map(cl), bumpers: sim.bumpers,
+        wind: sim.wind && cl(sim.wind), chaos: sim.chaos && cl(sim.chaos), fog: sim.fog, bouncy: sim.bouncy, lastTouch: sim.lastTouch, phase: 'play' });
+      if (this.rec.length > RP.MAX) this.rec.shift();
+    }
+
+    startReplay(g) {
+      this.rpArm = null;
+      const rec = this.rec;
+      if (rec.length < 2) return;
+      // golü her zaman göster: kısa kalırsa baştan kırp
+      const t1 = rec[rec.length - 1].t, t0 = Math.max(rec[0].t, t1 - RP.LEN, t1 - (g - RP.END) * RP.SPEED);
+      if (t1 - t0 < 30) return; // santradan hemen sonraki gol: gösterecek bir şey yok
+      const frames = rec.filter(f => f.t >= t0), b = frames[0].ball;
+      this.rp = { frames, t0, t1, g0: g, g1: g - (t1 - t0) / RP.SPEED, g, i: 0, fx: new FX(), ghosts: [], ballTrail: [], trailN: 0, trailI: 0, trailK: 0, cam: { x: b.x, y: b.y, z: RP.ZOOM } };
+    }
+
+    replayFrame(rp, ft, dt) {
+      const fr = rp.frames;
+      ft = Math.min(ft, rp.t1);
+      let i = rp.i;
+      while (i < fr.length - 2 && fr[i + 1].t <= ft) i++;
+      while (i > 0 && fr[i].t > ft) i--;
+      rp.i = i;
+      const a = fr[i], c = fr[Math.min(i + 1, fr.length - 1)], k = c.t > a.t ? Math.max(0, Math.min(1, (ft - a.t) / (c.t - a.t))) : 0;
+      // ışınlanma gibi büyük sıçramalarda ara kare yok
+      const L = (u, v) => Math.abs(v - u) > 60 ? (k < 0.5 ? u : v) : u + (v - u) * k;
+      const mix = (o, q) => Object.assign({}, o, { x: L(o.x, q.x), y: L(o.y, q.y) });
+      const f = Object.assign({}, a, { ball: mix(a.ball, c.ball), players: a.players.map((p, j) => mix(p, c.players[j])), z: a.z + (c.z - a.z) * k, nw: a.nw.map(w => w.slice()) });
+      // kamera topu yumuşakça izler, yavaşça yaklaşır; saha dışına taşmaz
+      const cam = rp.cam, u = (ft - rp.t0) / Math.max(1, rp.t1 - rp.t0), s = this.scale * cam.z;
+      cam.z = RP.ZOOM + 0.25 * u;
+      const fk = 1 - Math.pow(0.9, dt / RP.SPEED);
+      cam.x += (f.ball.x - cam.x) * fk; cam.y += (f.ball.y - cam.y) * fk;
+      const mx = Math.max(0, C.OW + 80 - this.w / 2 / s), my = Math.max(0, C.OH + 80 - this.h / 2 / s);
+      cam.x = Math.max(-mx, Math.min(mx, cam.x)); cam.y = Math.max(-my, Math.min(my, cam.y));
+      return f;
+    }
+
+    // ---- Ana çizim ----
+    drawScene(sim, dt, ext) {
       ext = ext || 0;
       const ctx = this.ctx;
       this.time += dt;
@@ -908,10 +997,12 @@
       // Kamera
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, this.cv.width, this.cv.height);
-      const s = this.scale * (1 + this.zoomPunch) * this.dpr;
+      const cam = this.cam;
+      const s = this.scale * (cam ? cam.z : 1 + this.zoomPunch) * this.dpr;
       const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
       const fx_ = this.zoomPunch * 3 * bx, fy_ = this.zoomPunch * 3 * by;
-      ctx.setTransform(s, 0, 0, s, this.cv.width / 2 + (sx - fx_) * this.dpr * this.scale * 0.5, this.cv.height / 2 + 30 * this.dpr * this.scale + (sy - fy_) * this.dpr * this.scale * 0.5);
+      if (cam) ctx.setTransform(s, 0, 0, s, this.cv.width / 2 - cam.x * s, this.cv.height / 2 + 30 * this.dpr * this.scale - cam.y * s);
+      else ctx.setTransform(s, 0, 0, s, this.cv.width / 2 + (sx - fx_) * this.dpr * this.scale * 0.5, this.cv.height / 2 + 30 * this.dpr * this.scale + (sy - fy_) * this.dpr * this.scale * 0.5);
 
       this.drawStadium(ctx);
       ctx.drawImage(this.pitch, -C.OW, -C.OH, 2 * C.OW, 2 * C.OH);
@@ -1042,15 +1133,17 @@
         if (Math.random() < 0.25) this.fx.ring(bx - ux * 18, by - uy * 18, 4, 26, 12, 'rgba(255,255,255,0.6)', 2);
       }
 
-      // top izi
-      if (bs > 5) {
-        const tl = Math.min(6, bs * 0.5);
-        const grd = ctx.createLinearGradient(bx, by - z, bx - b.vx * tl, by - z - b.vy * tl);
-        grd.addColorStop(0, b.fire > 0 ? 'rgba(255,159,28,0.7)' : 'rgba(255,255,255,0.45)');
-        grd.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.strokeStyle = grd; ctx.lineWidth = b.r * 1.6; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(bx, by - z); ctx.lineTo(bx - b.vx * tl, by - z - b.vy * tl); ctx.stroke();
+      // top hız izi: görsel konumların halka tamponu (ışınlanma / santrada kopar)
+      if (dt > 0) {
+        const T = this.trail, hy = by - z;
+        if (this.trailN) { const j = this.trailI * 3; if (Math.hypot(bx - T[j], hy - T[j + 1]) > 30 + bs * 2.5 * Math.max(1, dt)) this.trailN = 0; }
+        this.trailI = (this.trailI + 1) % TRAIL_N; const j = this.trailI * 3;
+        T[j] = bx; T[j + 1] = hy; T[j + 2] = this.time; this.trailN = Math.min(TRAIL_N, this.trailN + 1);
+        const special = b.curveT > 0 || b.spin || b.rocketT > 0 || b.fire > 0;
+        const want = sim.fog > 0 || special ? 0 : Math.min(1, Math.max(0, (bs - 6) / 2.5));
+        this.trailK = sim.fog > 0 ? 0 : this.trailK + (want - this.trailK) * (1 - Math.pow(want > this.trailK ? 0.6 : 0.9, dt));
       }
+      if (this.trailK > 0.02) this.drawTrail(ctx, sim, b, z, bs);
 
       this.drawAim(ctx, sim);
       // derinliğe göre sırala (y)
@@ -1308,6 +1401,63 @@
             ctx.beginPath(); ctx.arc(sx * FW, sy * GH, POST_R, 0, TAU); ctx.fill(); ctx.stroke();
           }
         }
+      }
+    }
+
+    drawTrail(ctx, sim, b, z, bs) {
+      const T = this.trail, P = this.trailP, K = this.trailK;
+      // pencere içindeki noktalar (yeniden eskiye), kuyruk tam TRAIL_T yaşında kesilir: her yenileme hızında aynı boy
+      let m = 0, L = 0;
+      for (let n = 0; n < this.trailN; n++) {
+        const j = ((this.trailI - n + TRAIL_N) % TRAIL_N) * 3, age = this.time - T[j + 2];
+        let x = T[j], y = T[j + 1], f = age / TRAIL_T;
+        if (age > TRAIL_T) {
+          if (!m) break;
+          const pa = (this.time - T[((this.trailI - n + 1 + TRAIL_N) % TRAIL_N) * 3 + 2]), k = (TRAIL_T - pa) / Math.max(1e-6, age - pa);
+          x = P[m * 3 - 3] + (x - P[m * 3 - 3]) * k; y = P[m * 3 - 2] + (y - P[m * 3 - 2]) * k; f = 1;
+        }
+        if (m) L += Math.hypot(x - P[m * 3 - 3], y - P[m * 3 - 2]);
+        P[m * 3] = x; P[m * 3 + 1] = y; P[m * 3 + 2] = Math.pow(1 - f, 0.75); m++;
+        if (f >= 1) break;
+      }
+      const r = b.r * (1 + Math.min(0.35, z * 0.02));
+      if (m < 2 || L < r) return;
+      const hw = r * (0.55 + 0.35 * K);
+      ctx.beginPath();
+      for (let s = 0; s < 2; s++) for (let k = 0; k < m; k++) {
+        const i = s ? m - 1 - k : k, a = Math.max(0, i - 1) * 3, c = Math.min(m - 1, i + 1) * 3;
+        const tx = P[a] - P[c], ty = P[a + 1] - P[c + 1], tl = Math.hypot(tx, ty) || 1, w = P[i * 3 + 2] * hw * (s ? -1 : 1);
+        const x = P[i * 3] - ty / tl * w, y = P[i * 3 + 1] + tx / tl * w;
+        if (!s && !k) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      // renk: beyaz; alevde turuncu, falsoda lila, çok sert şutta son dokunanın takım rengine kayar
+      let cr = 255, cg = 255, cb = 255, A = 0.5 * K, t = 0, c = null;
+      const kar = this.theme === 'kar';
+      if (b.fire > 0) { cg = 170; cb = 60; A = 0.65 * K; }
+      else if (b.spin) { cr = 215; cg = 195; }
+      else {
+        if (kar) { cr = 190; cg = 218; }
+        if (sim.lastTouch >= 0 && this.teamRGB) { t = Math.min(1, Math.max(0, (bs - 9.5) / 2.5)) * 0.8; c = this.teamRGB[sim.lastTouch]; }
+      }
+      const mix = (k) => t ? `${(cr + (c[0] - cr) * k) | 0},${(cg + (c[1] - cg) * k) | 0},${(cb + (c[2] - cb) * k) | 0}` : `${cr},${cg},${cb}`;
+      const head = mix(t * 0.3), tail = mix(t), x0 = P[0], y0 = P[1], x1 = P[m * 3 - 3], y1 = P[m * 3 - 2];
+      const grd = ctx.createLinearGradient(x0, y0, x1, y1);
+      grd.addColorStop(0, `rgba(${head},${A})`); grd.addColorStop(0.45, `rgba(${tail},${A * (0.45 + 0.2 * t)})`); grd.addColorStop(1, `rgba(${tail},0)`);
+      ctx.fillStyle = grd; ctx.fill();
+      if (kar) { // açık zeminde ince koyu kenar
+        const eg = ctx.createLinearGradient(x0, y0, x1, y1);
+        eg.addColorStop(0, `rgba(20,50,95,${0.4 * K})`); eg.addColorStop(1, 'rgba(20,50,95,0)');
+        ctx.strokeStyle = eg; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      // tam dolu şutlarda iki yanda hafif hız çizgileri
+      const sl = Math.min(1, Math.max(0, (bs - 10.3) / 2)) * K;
+      if (sl > 0.02) {
+        const ux = b.vx / bs, uy = b.vy / bs, d = r * 1.7;
+        ctx.strokeStyle = grd; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.globalAlpha = sl;
+        ctx.beginPath();
+        for (let s = -1; s <= 1; s += 2) { const ox = -uy * d * s, oy = ux * d * s; ctx.moveTo(x0 + ox - ux * L * 0.15, y0 + oy - uy * L * 0.15); ctx.lineTo(x0 + ox - ux * L * 0.7, y0 + oy - uy * L * 0.7); }
+        ctx.stroke(); ctx.globalAlpha = 1;
       }
     }
 

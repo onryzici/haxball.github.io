@@ -222,8 +222,7 @@
         case 'roket': p.rocket = 360; break;
         case 'hayalet': p.ghost = 240; break;
         case 'turbo': p.turbo = 260; p.stamina = 1; p.exhausted = false; break;
-        case 'kucult': opp.mini = 300; break;
-        case 'ters': opp.inv = 180; extra.tx = opp.x; extra.ty = opp.y; break;
+        case 'ters': opp.inv = 120; extra.tx = opp.x; extra.ty = opp.y; break;
         case 'bomba': b.bomb = 100; b.bombTeam = p.team; break;
         case 'mayin': {
           const mine = this.mines.filter(m => m.team === p.team);
@@ -232,7 +231,6 @@
           break;
         }
         case 'ruzgar': this.wind = { team: p.team, t: 210 }; break;
-        case 'lastik': this.bouncy = 420; break;
         case 'sis': this.fog = 170; break;
         case 'cagir': {
           const side = p.team === 0 ? 1 : -1;
@@ -247,19 +245,7 @@
           break;
         }
         case 'falso': p.curve = 300; break;
-        case 'miknatis': p.magnet = 96; break;
-        case 'dev': p.giant = 300; break;
         case 'eldiven': p.glove = C.GLOVE_TIME; break;
-        case 'atilma': {
-          let dx = ax, dy = ay;
-          let l = Math.hypot(dx, dy);
-          if (l < 0.1) { dx = p.vx; dy = p.vy; l = Math.hypot(dx, dy); }
-          if (l < 0.1) { dx = b.x - p.x; dy = b.y - p.y; l = Math.hypot(dx, dy) || 1; }
-          dx /= l; dy /= l;
-          p.vx = p.vx * 0.25 + dx * 8.2; p.vy = p.vy * 0.25 + dy * 8.2;
-          p.dash = 16;
-          break;
-        }
         case 'sok': {
           const R = 135;
           for (const o of [b, ...this.foes(p)]) {

@@ -144,23 +144,18 @@
     },
     ability(a) {
       switch (a) {
-        case 'atilma': noise(0.3, 'bandpass', 1800, 1.5, 0.45); tone('sine', 300, 900, 0.18, 0.12); break;
         case 'sok': tone('sine', 120, 25, 0.6, 1); noise(0.5, 'lowpass', 600, 0.7, 0.7); break;
         case 'roket': tone('square', 220, 660, 0.18, 0.08); tone('square', 330, 990, 0.18, 0.06, ctx && ctx.currentTime + 0.08); break;
         case 'falso': tone('sine', 400, 1200, 0.3, 0.15); tone('sine', 1200, 400, 0.3, 0.1, ctx && ctx.currentTime + 0.15); break;
-        case 'miknatis': tone('sawtooth', 70, 140, 1.4, 0.07); tone('sine', 140, 280, 1.4, 0.12); break;
-        case 'dev': tone('sawtooth', 60, 30, 0.7, 0.25); tone('sine', 110, 55, 0.7, 0.5); break;
         case 'buz': for (const f of [1800, 2400, 3100]) tone('sine', f, f * 1.02, 0.5, 0.06); noise(0.35, 'highpass', 4000, 0.8, 0.2); break;
         case 'eldiven': tone('triangle', 500, 750, 0.18, 0.12); noise(0.12, 'bandpass', 2500, 2, 0.15); break;
         case 'isinlan': tone('sine', 1500, 200, 0.25, 0.15); tone('triangle', 200, 1600, 0.25, 0.1, ctx && ctx.currentTime + 0.12); break;
         case 'hayalet': tone('sine', 600, 200, 0.6, 0.12); tone('sine', 900, 300, 0.6, 0.06); break;
         case 'turbo': tone('sawtooth', 100, 400, 0.4, 0.15); noise(0.4, 'bandpass', 2000, 1, 0.3); break;
-        case 'kucult': tone('sine', 900, 1800, 0.3, 0.15); break;
         case 'ters': tone('square', 400, 200, 0.15, 0.08); tone('square', 200, 400, 0.15, 0.08, ctx && ctx.currentTime + 0.15); break;
         case 'bomba': tone('square', 880, 880, 0.08, 0.1); tone('square', 880, 880, 0.08, 0.1, ctx && ctx.currentTime + 0.25); break;
         case 'mayin': tone('triangle', 200, 120, 0.2, 0.2); break;
         case 'ruzgar': noise(1.2, 'bandpass', 600, 0.5, 0.5, 0, 0.2); break;
-        case 'lastik': tone('sine', 200, 600, 0.25, 0.25); break;
         case 'cagir': tone('sine', 300, 1500, 0.3, 0.15); tone('triangle', 1500, 1500, 0.2, 0.06, ctx && ctx.currentTime + 0.25); break;
         case 'sis': noise(0.9, 'lowpass', 500, 0.5, 0.4, 0, 0.1); break;
         case 'kalkan': tone('square', 150, 150, 0.2, 0.08); tone('sine', 300, 600, 0.3, 0.2); noise(0.2, 'lowpass', 800, 1, 0.3); break;
